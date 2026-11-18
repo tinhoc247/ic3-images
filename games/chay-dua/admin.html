@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head><script src="../../quota.js"></script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Chạy đua – Điều khiển</title>
+<link rel="stylesheet" href="race.css">
+<style>
+body{overflow:auto}
+#app{height:auto;min-height:100%;overflow:visible}
+.top{position:sticky;top:0;z-index:40;display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 14px;background:rgba(15,23,42,.9);color:#fff}
+.top h1{margin:0;font-size:20px;flex:1;min-width:160px}
+.top .code{font-size:30px;font-weight:900;letter-spacing:6px;color:#fde047;background:#ffffff18;padding:2px 14px;border-radius:12px}
+.top .st{padding:3px 12px;border-radius:99px;font-weight:800;background:#ffffff22}
+.top button{padding:8px 14px;font-size:15px}
+.wrapA{position:relative;z-index:2;max-width:1280px;margin:0 auto;padding:14px;display:grid;grid-template-columns:minmax(0,1.7fr) minmax(280px,1fr);gap:14px;align-items:start}
+@media(max-width:960px){.wrapA{grid-template-columns:1fr}}
+.panel{background:rgba(255,255,255,.96);border-radius:20px;padding:14px 16px;box-shadow:0 8px 24px #0003}
+.panel h3{margin:0 0 8px;color:#0f172a}
+.lanes{max-height:78vh;overflow:auto;border-radius:14px}
+/* Đường đua chung: mọi người chơi chạy trên cùng một con đường nhiều làn (giống mẫu đua xe) */
+.rd2{--sp:190px;--fw:30px;position:relative;min-height:300px;background:#555b66;overflow:hidden;border-radius:6px;transition:height .4s}
+.rd2 .curb{position:absolute;left:0;right:0;height:10px;z-index:1;background:repeating-linear-gradient(90deg,#e53935 0 22px,#fff 22px 44px)}
+.rd2 .curb.t{top:0}.rd2 .curb.b{bottom:0}
+.rd2 .dv{position:absolute;left:0;right:0;height:4px;opacity:.75;background:repeating-linear-gradient(90deg,#e5e7eb 0 70px,transparent 70px 140px)}
+.rd2 .stl{position:absolute;top:10px;bottom:10px;left:calc(var(--sp) - 6px);width:3px;background:#ffffff66}
+.rd2 .fin2{position:absolute;right:0;top:0;bottom:0;width:var(--fw);z-index:1;background:repeating-conic-gradient(#111 0 25%,#fff 0 50%) 0 0/15px 15px}
+.rd2 .tk2{position:absolute;top:10px;bottom:10px;width:1px;background:#ffffff1f}
+.rd2 .rc{position:absolute;display:flex;align-items:center;gap:3px;transform:translate(-100%,-50%);white-space:nowrap;transition:left .9s cubic-bezier(.4,0,.2,1),top .5s;z-index:2}
+.rd2 .rc.kk{cursor:pointer}
+.rd2 .rc:hover{z-index:9999!important}
+.rd2 .rc .nm2{max-width:140px;overflow:hidden;text-overflow:ellipsis;padding:1px 9px;border-radius:99px;font-size:12px;font-weight:800;line-height:18px;color:#fff;background:#1f2a2e;border:2px solid #ea8a2b;box-shadow:0 2px 3px #0005}
+.rd2 .rc.lead .nm2{background:#ea8a2b;border-color:#ea8a2b}
+.rd2 .rc .av{position:relative;display:block;font-size:20px;line-height:1;filter:drop-shadow(0 2px 2px #0006);animation:run .5s ease-in-out infinite alternate}
+.rd2 .rc.fin .av{animation:none}
+.rd2 .rc.fz .av{filter:drop-shadow(0 0 8px #7dd3fc) saturate(.3);animation:none}
+.rd2 .rc.fz .nm2{border-color:#7dd3fc;background:#0c4a6e}
+.rd2 .rc.bk .nm2{border-color:#f97316;background:#7c2d12}
+.rd2 .rc .ri{position:absolute;right:0;top:-12px;font-style:normal;font-size:16px;z-index:3}
+.feed{max-height:34vh;overflow:auto;font-size:15px}.feed div{padding:5px 0;border-bottom:1px solid #e5e7eb}
+.big2{font-size:clamp(34px,6vw,64px);font-weight:900;text-align:center;color:#c2410c}
+.rank li{display:flex;gap:8px;align-items:center;padding:4px 0;font-weight:800;list-style:none}.rank{margin:0;padding:0}
+.rank .n{width:30px;text-align:center}.rank .p{margin-left:auto;color:#64748b;font-weight:700;font-size:14px}
+.lg{min-height:100vh;display:grid;place-items:center;padding:16px;position:relative;z-index:2}
+.lg form{width:100%;max-width:380px;background:#fff;border-radius:22px;padding:26px 22px;text-align:center;box-shadow:0 10px 30px #0004}
+.lg h2{margin:0 0 14px;color:#c2410c}
+.dash{position:fixed;left:8px;bottom:8px;z-index:50;background:rgba(20,33,61,.82);color:#fff;font:600 12px/1 system-ui,sans-serif;padding:7px 10px;border-radius:8px;text-decoration:none}
+</style>
+<link rel="stylesheet" href="../../fonts/vn-font.css"></head>
+<body class="adm">
+<div class="scene" aria-hidden="true">
+  <div class="sun"></div><i class="cl c1">☁️</i><i class="cl c2">☁️</i><i class="cl c3">☁️</i>
+  <div class="hill h1"></div><div class="hill h2"></div><div class="flags"></div><div class="stand"></div>
+  <div class="crowd" id="crowd"></div><div class="road"></div>
+</div>
+<div id="app"></div>
+<div id="toast"></div>
+<div class="ov" id="ovC"><div class="cnt" id="ovCn">3</div></div>
+<div class="tools"><button id="bSnd" title="Bật/tắt âm thanh">🔊</button><button id="bFs" title="Toàn màn hình">⛶</button></div>
+<a class="dash" href="../../admin.html" title="Về dashboard chung">⌂ Dashboard chung</a>
+
+<script>window.APPMODE = 'admin';</script>
+<script src="../../vk.js"></script>
+<script src="race.js"></script>
+<script>
+(function () {
+  'use strict';
+  document.getElementById('crowd').innerHTML = Array.from({ length: 60 }, (_, i) => '<span>' + ['🙌', '🧑‍🎓', '📣', '👏', '🎉', '🧒', '🙋'][i % 7] + '</span>').join('');
+  const qs = new URLSearchParams(location.search);
+  const CTL = String(qs.get('ctl') || '').toUpperCase(), REP = String(qs.get('rep') || '').toUpperCase();
+  const CODE = CTL || REP, app = $('#app');
+  let S = null, PL = {}, QS = [], NQ = 1, LGall = {}, TI = null, lastKey = '', seen = new Set(), FZ = {}, BK = {}, FEED = [], finSeen = new Set(), autoEnded = false, LGat = 0;
+  $('#bSnd').textContent = Snd.mute ? '🔇' : '🔊';
+  $('#bSnd').onclick = () => { $('#bSnd').textContent = Snd.toggle() ? '🔇' : '🔊'; };
+  $('#bFs').onclick = () => { const d = document, e = d.documentElement; if (d.fullscreenElement) d.exitFullscreen(); else (e.requestFullscreen || (() => {})).call(e); };
+  const stored = () => { try { const j = JSON.parse(localStorage.getItem('hubPwL') || 'null'); if (j && j.p && j.t > Date.now()) return j.p; } catch (_) {} try { return sessionStorage.getItem('hubPw'); } catch (_) { return null; } };
+  const keep = pw => { try { sessionStorage.setItem('hubPw', pw); localStorage.setItem('hubPwL', JSON.stringify({ p: pw, t: Date.now() + 432e5 })); } catch (_) {} };
+
+  function login(msg) {
+    app.innerHTML = `<div class="lg"><form id="f"><h2>🏁 Chạy đua – Admin</h2>
+      <span class="pww"><input class="fld" id="pw" type="password" placeholder="Mật khẩu admin" autocomplete="current-password"><button type="button" class="vkb" data-vk="pw" data-ok="document.getElementById('f').requestSubmit()" style="right:54px" title="Bàn phím ảo" aria-label="Bàn phím ảo">⌨️</button><button type="button" class="pwb" title="Hiện mật khẩu" aria-label="Hiện mật khẩu" onmousedown="event.preventDefault()" onclick="var i=document.getElementById('pw'),h=i.type=='password';i.type=h?'text':'password';this.textContent=h?'🙈':'👁️';i.focus()">👁️</button></span>
+      <div class="err" id="er">${esc(msg || '')}</div><button class="ego" id="go">Đăng nhập</button></form></div>`;
+    $('#f').onsubmit = async e => {
+      e.preventDefault(); ADMPW = $('#pw').value; $('#er').textContent = '';
+      try { TOK = null; await fbAuth(); keep(ADMPW); start(); } catch (x) { $('#er').textContent = x.message; }
+    };
+    $('#pw').focus();
+  }
+
+  async function start() {
+    if (!CODE) return location.replace('../../admin.html');
+    try {
+      S = await fb(G('sessions/' + CODE));
+      if (!S) { app.innerHTML = '<div class="lg"><form><h2>Không tìm thấy phòng ' + esc(CODE) + '</h2><button class="ego" type="button" onclick="location.href=\'../../admin.html\'">Về dashboard</button></form></div>'; return; }
+      NQ = +S.nq || 1;
+      try { QS = JSON.parse((await fb(G('quiz/' + CODE))) || '[]'); } catch (_) { QS = []; }
+      const ev = await fbEvents(CODE, ''); seen = new Set(Object.keys(ev)); lastKey = Object.keys(ev).sort().pop() || '';
+      Object.keys(ev).sort().forEach(k => feedEv(ev[k], true));
+      await tick(true);
+      TI = setInterval(tick, 1500);
+    } catch (e) { app.innerHTML = '<div class="lg"><form><h2>Lỗi</h2><p class="err">' + esc(e.message) + '</p></form></div>'; }
+  }
+
+  /* ---------- Nhật ký sự kiện ---------- */
+  function feedEv(e, quiet) {
+    if (!e) return;
+    const t = e.type; let h = '';
+    if (t === 'step') h = `🚀 ${avOf(e.fa)} <b>${esc(e.fn)}</b> dùng năng lực: tiến thêm 1 bước`;
+    else if (t === 'back') { h = `⏪ ${avOf(e.fa)} <b>${esc(e.fn)}</b> kéo lùi ${avOf(e.ta)} <b>${esc(e.tn)}</b> 1 bước`; if (e.to && !quiet) { BK[e.to] = 1; setTimeout(() => { delete BK[e.to]; draw(); }, 1600); } }
+    else if (t === 'freeze') { h = `🧊 ${avOf(e.fa)} <b>${esc(e.fn)}</b> đóng băng ${avOf(e.ta)} <b>${esc(e.tn)}</b> 3 giây`; if (e.to && !quiet) { FZ[e.to] = 1; Snd.freeze(); setTimeout(() => { delete FZ[e.to]; draw(); }, FREEZE_MS); } }
+    if (h) FEED.unshift(h);
+    FEED = FEED.slice(0, 60);
+  }
+
+  async function tick(first) {
+    try {
+      const [s, p, ev] = await Promise.all([fb(G('sessions/' + CODE)), fb(G('players/' + CODE)), fbEvents(CODE, lastKey)]);
+      if (!s) return;
+      const prev = S && S.status; S = s; PL = p || {};
+      Object.keys(ev).sort().forEach(k => { if (seen.has(k)) return; seen.add(k); lastKey = k; feedEv(ev[k]); });
+      L().forEach(r => { if (r.fin > 0 && !finSeen.has(r.id)) { finSeen.add(r.id); if (!first) { FEED.unshift(`🏁 ${avOf(r.av)} <b>${esc(r.name)}</b> về đích!`); Snd.cheer(2.2, .08); } } });
+      if (S.status === 'ended' || Date.now() - LGat > 8000) { LGat = Date.now(); try { LGall = (await fb(G('logs/' + CODE))) || {}; } catch (_) {} }
+      /* có người về đích đầu tiên thì cuộc đua kết thúc */
+      const all = L(); if (CTL && S.status === 'running' && !autoEnded && all.length && all.some(r => r.fin > 0)) { autoEnded = true; endRace(true); }
+      if (prev === 'waiting' && S.status === 'running' && !first) { /* đã bắt đầu từ máy khác */ }
+      draw();
+    } catch (e) { /* thử lại lượt sau */ }
+  }
+  const L = () => rankPlayers(PL);
+
+  /* ---------- Điều khiển ---------- */
+  /* đếm ngược cùng mốc giờ máy chủ với học sinh: Sẵn sàng → 3 → 2 → 1 → GO! */
+  function countdownStart(startAt, off) {
+    return new Promise(res => raceCountdown(startAt, off, $('#ovC'), $('#ovCn'), res));
+  }
+  async function startRace() {
+    if (!L().length && !confirm('Chưa có người chơi nào trong phòng. Vẫn bắt đầu?')) return;
+    try {
+      const t0 = Date.now(), r = await fb(G('sessions/' + CODE), 'PATCH', { status: 'running', startedAt: { '.sv': 'timestamp' } }), t1 = Date.now();
+      const sa = r && +r.startedAt > 0 ? +r.startedAt : 0, off = sa ? sa - (t0 + t1) / 2 : 0;
+      S.status = 'running'; if (sa) S.startedAt = sa; draw();
+      await countdownStart(sa || Date.now(), sa ? off : 0);
+    } catch (e) { toast(e.message); }
+  }
+  async function endRace(auto) {
+    if (!auto && !confirm('Kết thúc cuộc đua và hiện bảng tóm tắt cho tất cả?')) return;
+    try { await fb(G('sessions/' + CODE), 'PATCH', { status: 'ended', endedAt: { '.sv': 'timestamp' } }); S.status = 'ended'; Snd.win(); draw(); } catch (e) { toast(e.message); }
+  }
+  async function kick(id) {
+    const r = PL[id]; if (!r || !confirm('Mời ' + r.name + ' ra khỏi phòng?')) return;
+    try { await fb(G('players/' + CODE + '/' + id), 'DELETE'); delete PL[id]; draw(); } catch (e) { toast(e.message); }
+  }
+  function toast(t) { const d = document.createElement('div'); d.textContent = t; $('#toast').appendChild(d); setTimeout(() => d.remove(), 4000); }
+  const link = () => { const u = new URL('../../index.html', location.href); u.searchParams.set('code', CODE); return u.href; };   /* trang học sinh chung */
+  async function copy(t) { try { await navigator.clipboard.writeText(t); toast('Đã chép: ' + t); } catch (_) { prompt('Chép link này:', t); } }
+  function csv() {
+    const rows = [['Hạng', 'Tên', 'Bước', 'Về đích', 'Câu đúng', 'Câu sai (lượt)', 'Chính xác %']];
+    L().forEach((r, i) => rows.push([i + 1, r.name, (r.pos | 0) + '/' + NQ, r.fin > 0 ? 'Có' : 'Chưa', r.ok | 0, r.bad | 0, acc(r)]));
+    const b = new Blob(['﻿' + rows.map(r => r.map(c => '"' + String(c).replace(/"/g, '""') + '"').join(',')).join('\n')], { type: 'text/csv' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'chay-dua-' + CODE + '.csv'; a.click();
+  }
+
+  /* ---------- Vẽ (khung vẽ 1 lần theo trạng thái; làn đua cập nhật tại chỗ để avatar chạy mượt) ---------- */
+  let shell = '';
+  const SP = 190, FW = 30;   /* vùng xuất phát (chừa chỗ cho nhãn tên) và vạch đích, px */
+  const posLeft = pct => `calc(${SP}px + (100% - ${SP + FW}px) * ${pct.toFixed(4)})`;
+  function buildRoad(box) {
+    const ticks = NQ <= 60 ? Array.from({ length: Math.max(0, NQ - 1) }, (_, k) => `<i class="tk2" style="left:calc(${SP}px + (100% - ${SP + FW}px) * ${((k + 1) / NQ).toFixed(4)})"></i>`).join('') : '';
+    box.innerHTML = `<div class="rd2"><div class="curb t"></div><div class="curb b"></div>${[25, 50, 75].map(t => `<i class="dv" style="top:${t}%"></i>`).join('')}<div class="stl"></div>${ticks}<div class="fin2"></div></div>`;
+    return box.firstChild;
+  }
+  function updLanes() {
+    const box = $('#lanes'); if (!box) return;
+    const ids = Object.keys(PL).filter(k => PL[k] && PL[k].name).sort((a, b) => (PL[a].joined | 0) - (PL[b].joined | 0));
+    let rd = box.querySelector('.rd2');
+    if (!ids.length) { box.innerHTML = '<p class="hint">Chưa có người chơi. Gửi mã hoặc link cho học sinh.</p>'; return; }
+    if (!rd) rd = buildRoad(box);
+    const n = ids.length, H = Math.max(300, Math.min(n * 34 + 24, 720));
+    rd.style.height = H + 'px';
+    const ranks = {}; L().forEach((r, i) => ranks[r.id] = i + 1);
+    rd.querySelectorAll('.rc').forEach(e => { if (!PL[e.dataset.id]) e.remove(); });
+    ids.forEach((id, i) => {
+      const r = PL[id], pct = Math.min(1, (r.pos | 0) / NQ), f = r.fin > 0;
+      let e = rd.querySelector('.rc[data-id="' + id + '"]');
+      if (!e) { rd.insertAdjacentHTML('beforeend', `<div class="rc" data-id="${id}"><span class="nm2"></span><span class="av"></span><i class="ri"></i></div>`); e = rd.lastChild; }
+      e.className = 'rc' + (CTL && S.status !== 'ended' ? ' kk' : '') + (ranks[id] === 1 && (r.pos | 0) > 0 ? ' lead' : '') + (f ? ' fin' : '') + (FZ[id] ? ' fz' : '') + (BK[id] ? ' bk' : '');
+      if (CTL && S.status !== 'ended') e.dataset.k = id; else delete e.dataset.k;
+      e.style.left = posLeft(pct); e.style.top = (10 + (i + .5) * (H - 20) / n).toFixed(1) + 'px'; e.style.zIndex = 10 + (r.pos | 0) + (f ? 500 : 0);
+      e.title = `${r.name} · ${r.pos | 0}/${NQ}` + (e.dataset.k ? ' (bấm để mời ra khỏi phòng)' : '');
+      const nm = e.querySelector('.nm2'), t = (f ? '🏁 ' : '') + r.name; if (nm.textContent !== t) nm.textContent = t;
+      const av = e.querySelector('.av'); if (av.dataset.a !== String(r.av)) { av.dataset.a = String(r.av); av.innerHTML = avOf(r.av); }
+      e.querySelector('.ri').textContent = FZ[id] ? '❄️' : BK[id] ? '⏪' : '';
+    });
+  }
+  function draw() {
+    if (!S) return;
+    const st = S.status, ended = st === 'ended', P = L();
+    const key = [st, NQ, S.title, CTL].join('|');
+    if (key !== shell) {
+      shell = key;
+      const btns = CTL ? (st === 'waiting' ? '<button class="gr" id="bS">▶ Bắt đầu cuộc đua</button>' : st === 'running' ? '<button class="rd" id="bE">⏹ Kết thúc</button>' : '') : '';
+      const stTxt = { waiting: '⏳ Đang chờ', running: '🏃 Đang đua', ended: '🏁 Đã kết thúc' }[st] || st;
+      app.innerHTML = `<div class="top"><h1>🏁 ${esc(S.title || 'Chạy đua')}</h1><span class="code">${esc(CODE)}</span><span class="st">${stTxt}</span>
+        <span class="st" id="cnt"></span><span class="st">Đường đua: ${NQ} bước</span>
+        <button class="alt" id="bL">🔗 Chép link</button>${btns}${ended ? '<button class="alt" id="bC">⬇ CSV</button>' : ''}</div>
+        <div class="wrapA"><div>${ended ? '<div class="panel" id="sumP"></div>' : '<div class="panel"><h3>🛣️ Đường đua</h3><div class="lanes" id="lanes"></div></div>'}</div>
+        <div>${st === 'waiting' ? `<div class="panel" style="margin-bottom:14px"><h3>Mời học sinh vào</h3><div class="big2">${esc(CODE)}</div><p class="hint" style="text-align:center">Học sinh mở trang chủ rồi nhập mã này. Hoặc gửi link:<br><b style="word-break:break-all">${esc(link())}</b></p></div>` : ''}
+        ${ended ? '' : '<div class="panel" style="margin-bottom:14px"><h3>🥇 Xếp hạng</h3><ol class="rank" id="rk"></ol></div>'}
+        <div class="panel"><h3>📣 Diễn biến</h3><div class="feed" id="fd"></div></div></div></div>`;
+      const g = id => document.getElementById(id);
+      if (g('bS')) g('bS').onclick = startRace; if (g('bE')) g('bE').onclick = () => endRace(false);
+      g('bL').onclick = () => copy(link()); if (g('bC')) g('bC').onclick = csv;
+      $('.wrapA').addEventListener('click', e => { const b = e.target.closest('[data-k]'); if (b) kick(b.dataset.k); });
+    }
+    $('#cnt').textContent = '👥 ' + P.length;
+    if (ended) { const sp = $('#sumP'); if (sp) sp.innerHTML = `<div class="big2">🏆 Cuộc đua kết thúc</div>${sumHtml(PL, LGall, QS, NQ, '')}`; }
+    else {
+      updLanes();
+      $('#rk').innerHTML = P.slice(0, 10).map((r, i) => `<li><span class="n">${['🥇', '🥈', '🥉'][i] || i + 1}</span><span>${avOf(r.av)} ${esc(r.name)}</span><span class="p">${r.fin > 0 ? '🏁 về đích' : (r.pos | 0) + '/' + NQ} · ✅${r.ok | 0}</span></li>`).join('') || '<li class="hint">Chưa có ai.</li>';
+    }
+    $('#fd').innerHTML = FEED.map(h => `<div>${h}</div>`).join('') || '<p class="hint">Hiệu ứng năng lực sẽ hiện ở đây.</p>';
+  }
+
+  (async function boot() {
+    const pw = stored(); if (pw) { ADMPW = pw; try { await fbAuth(); return start(); } catch (e) { /* sai mật khẩu đã lưu */ } }
+    login();
+  })();
+})();
+</script>
+</body>
+</html>
